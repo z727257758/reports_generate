@@ -1,4 +1,5 @@
 import datetime
+import argparse
 from pathlib import Path
 from typing import List
 from daily_generation import GitReportGenerator
@@ -57,24 +58,24 @@ def generate_reports_for_date_range(
     print(f"\n所有日报已生成完成，保存在目录: {output_dir}")
 
 
-if __name__ == "__main__":
-    # 配置参数
-    REPOSITORIES = [
-        "D:\project\8yuan\middle",  # 替换为实际的仓库路径
-        "D:\project\8yuan\zk_test",
-        # 可以添加更多仓库路径
-    ]
+def main():
+    parser = argparse.ArgumentParser(description='生成日期范围内的Git提交日报')
+    parser.add_argument('--repos', nargs='+', required=True, help='Git仓库路径列表')
+    parser.add_argument('--start-date', required=True, help='开始日期 (YYYY-MM-DD)')
+    parser.add_argument('--end-date', required=True, help='结束日期 (YYYY-MM-DD)')
+    parser.add_argument('--output-dir', default='reports', help='输出目录')
+    parser.add_argument('--api-key', help='DashScope API Key')
 
-    START_DATE = "2025-01-25"  # 开始日期
-    END_DATE = "2025-02-25"  # 结束日期
-    OUTPUT_DIR = "daily_reports"  # 输出目录
-    API_KEY = "sk-6c7638170cb84af48685a33370a5e8d9"  # 你的API密钥
+    args = parser.parse_args()
 
-    # 生成报告
     generate_reports_for_date_range(
-        repos=REPOSITORIES,
-        start_date=START_DATE,
-        end_date=END_DATE,
-        output_dir=OUTPUT_DIR,
-        api_key=API_KEY
+        repos=args.repos,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        output_dir=args.output_dir,
+        api_key=args.api_key
     )
+
+
+if __name__ == "__main__":
+    main()
