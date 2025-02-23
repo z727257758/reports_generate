@@ -4,6 +4,7 @@ import subprocess
 import datetime
 import argparse
 from typing import Optional, List, Dict
+from pathlib import Path
 
 
 def parse_date_range(start_date: str, end_date: Optional[str] = None) -> tuple[str, str]:
@@ -32,14 +33,59 @@ def parse_date_range(start_date: str, end_date: Optional[str] = None) -> tuple[s
         raise ValueError("日期格式错误，请使用YYYY-MM-DD格式") from e
 
 
-def get_commits_for_date_range(start_date: str, end_date: str) -> List[str]:
-    """获取指定日期范围的commits"""
+def is_git_repo(path: str) -> bool:
+    """检查指定路径是否为Git仓库"""
+    try:
+        result = subprocess.run(
+            ['git', 'rev-parse', '--is-inside-work-tree'],
+            cwd=path,
+            capture_output=True,
+            text=True
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def get_repo_name(repo_path: str) -> str:
+    """获取仓库名称"""
+    return os.path.basename(os.path.abspath(repo_path))
+
+
+def get_commits_from_repo(repo_path: str, start_date: str, end_date: str) -> List[Dict]:
+    """获取指定仓库在日期范围内的commits"""
+    if not is_git_repo(repo_path):
+        print(f"警告: {repo_path} 不是有效的Git仓库")
+        return []
+
     cmd = f'git log --since="{start_date}" --until="{end_date}" --date=format:"%Y-%m-%d %H:%M:%S" --pretty=format:"%ad | %an | %B%n%n"'
     try:
-        result = subprocess.check_output(cmd, shell=True)
-        return result.decode('utf-8').split('\n\n\n')
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8'
+        )
+        if result.returncode != 0:
+            print(f"获取 {repo_path} 的git日志失败: {result.stderr}")
+            return []
+
+        commits = result.stdout.split('\n\n\n')
+        formatted_commits = []
+        repo_name = get_repo_name(repo_path)
+
+        for commit in commits:
+            commit_info = format_commit(commit)
+            if commit_info:
+                commit_info['repo'] = repo_name
+                formatted_commits.append(commit_info)
+
+        return formatted_commits
+
     except subprocess.CalledProcessError as e:
-        print(f"获取git日志失败: {e}")
+        print(f"获取 {repo_path} 的git日志失败: {e}")
         return []
 
 
@@ -96,20 +142,30 @@ def format_commit(commit_str: str) -> Optional[Dict]:
     }
 
 
-def generate_report(commits: List[str]) -> str:
+def generate_report(commits: List[Dict]) -> str:
     """生成工作日报"""
-    if not commits or commits[0].strip() == '':
+    if not commits:
         return "未找到指定日期范围的提交记录"
 
+    # 按仓库组织提交记录
     formatted_commits = ""
+    commits_by_repo = {}
     for commit in commits:
-        commit_info = format_commit(commit)
-        if commit_info:
-            formatted_commits += f"时间：{commit_info['date']}\n"
-            formatted_commits += f"作者：{commit_info['author']}\n"
-            formatted_commits += f"主题：{commit_info['subject']}\n"
-            if commit_info['body']:
-                formatted_commits += f"详细说明：\n{commit_info['body']}\n"
+        repo = commit['repo']
+        if repo not in commits_by_repo:
+            commits_by_repo[repo] = []
+        commits_by_repo[repo].append(commit)
+
+    # 格式化每个仓库的提交记录
+    for repo, repo_commits in commits_by_repo.items():
+        formatted_commits += f"\n仓库：{repo}\n"
+        formatted_commits += "-" * 50 + "\n"
+        for commit in repo_commits:
+            formatted_commits += f"时间：{commit['date']}\n"
+            formatted_commits += f"作者：{commit['author']}\n"
+            formatted_commits += f"主题：{commit['subject']}\n"
+            if commit['body']:
+                formatted_commits += f"详细说明：\n{commit['body']}\n"
             formatted_commits += "\n"
 
     prompt = f"""请基于以下git提交记录生成工作日报:
@@ -118,14 +174,14 @@ def generate_report(commits: List[str]) -> str:
 
     请按照以下格式生成日报：
     1. 总结今日主要工作内容
-    2. 按照功能模块分类整理具体工作
+    2. 按照仓库和功能模块分类整理具体工作
     3. 重要的工作进展
     4. 待解决的问题
 
     要求:
     1.200字左右
     2.使用专业且简洁的描述
-    3. 突出重要的工作内容
+    3.突出重要的工作内容
     """
 
     try:
@@ -153,17 +209,36 @@ def generate_report(commits: List[str]) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='生成Git提交记录的工作日报')
+    parser = argparse.ArgumentParser(description='生成多个Git仓库的工作日报')
     parser.add_argument('start_date', help='开始日期 (YYYY-MM-DD格式)')
     parser.add_argument('--end_date', help='结束日期 (YYYY-MM-DD格式，可选)', default=None)
+    parser.add_argument('--repos', nargs='+', help='Git仓库路径列表', required=True)
     parser.add_argument('--output', help='输出文件名（可选）', default=None)
 
     args = parser.parse_args()
 
     try:
         start_date, end_date = parse_date_range(args.start_date, args.end_date)
-        commits = get_commits_for_date_range(start_date, end_date)
-        report = generate_report(commits)
+
+        # 收集所有仓库的提交记录
+        all_commits = []
+        for repo_path in args.repos:
+            repo_path = os.path.abspath(repo_path)
+            if not os.path.exists(repo_path):
+                print(f"警告: 仓库路径不存在: {repo_path}")
+                continue
+
+            commits = get_commits_from_repo(repo_path, start_date, end_date)
+            all_commits.extend(commits)
+
+        if not all_commits:
+            print("警告: 在指定的日期范围内未找到任何提交记录")
+            return
+
+        # 按时间排序
+        all_commits.sort(key=lambda x: x['date'])
+
+        report = generate_report(all_commits)
 
         if args.output:
             output_file = args.output
