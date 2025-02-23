@@ -11,7 +11,17 @@ def get_today_commits():
     result = subprocess.check_output(cmd, shell=True)
     return result.decode('utf-8').split('\n\n\n')
 
-
+def get_token_usage(response_data):
+    """获取API调用的token使用情况"""
+    try:
+        usage = response_data.get('usage', {})
+        return {
+            'input_tokens': usage.get('input_tokens', 0),
+            'output_tokens': usage.get('output_tokens', 0),
+            'total_tokens': usage.get('total_tokens', 0)
+        }
+    except Exception:
+        return None
 def extract_report_content(response_data):
     """从API响应中安全地提取日报内容"""
     try:
@@ -103,7 +113,7 @@ def generate_report(commits):
 
         # 可以添加使用统计信息的记录
         if 'usage' in response_data:
-            usage = response_data['usage']
+            usage = get_token_usage(response_data)
             print(f"Token usage: {usage}")
 
         return report_content
