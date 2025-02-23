@@ -22,3 +22,4 @@
 
 ```bash
 python daily_generation.py --repos /path/to/repo1 /path/to/repo2 --start_date 2025-01-01 [--end_date 2025-01-02] [--output report.txt]
+python generate_range_reports.py --repos "D:\projects\project1" "D:\projects\project2" --start-date 2024-02-01 --end-date 2024-02-23 --output-dir my_reports
