@@ -2,7 +2,7 @@ import datetime
 import argparse
 from pathlib import Path
 from typing import List
-from daily_generation import GitReportGenerator
+from git_daily_generation import GitReportGenerator
 
 
 def generate_reports_for_date_range(
