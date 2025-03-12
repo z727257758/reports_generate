@@ -77,9 +77,6 @@ class CustomReportGenerator:
 ## 今日主要工作内容
 {work_content}
 
-## 按照仓库和功能模块分类整理具体工作
-{progress}
-
 ## 重要的工作进展
 {issues}
 
