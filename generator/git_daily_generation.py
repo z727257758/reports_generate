@@ -270,11 +270,11 @@ class GitReportGenerator:
 def main():
     """命令行入口函数"""
     parser = argparse.ArgumentParser(description='生成多个Git仓库的工作日报')
-    parser.add_argument('start_date', help='开始日期 (YYYY-MM-DD格式)')
+    parser.add_argument('--start_date', help='开始日期 (YYYY-MM-DD格式)', default=datetime.datetime.now().strftime('%Y-%m-%d'))
     parser.add_argument('--end_date', help='结束日期 (YYYY-MM-DD格式，可选)', default=None)
     parser.add_argument('--repos', nargs='+', help='Git仓库路径列表', required=True)
     parser.add_argument('--output', help='输出文件名（可选）', default=None)
-    parser.add_argument('--api_key', help='DashScope API Key', default='sk-6c7638170cb84af48685a33370a5e8d9')
+    parser.add_argument('--api-key', help='DashScope API Key', default='sk-6c7638170cb84af48685a33370a5e8d9')
 
     args = parser.parse_args()
 
